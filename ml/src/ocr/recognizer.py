@@ -11,6 +11,7 @@ class OCRRecognizer:
     @staticmethod
     def extract_prescription_text(raw_text: str) -> dict:
         text = " ".join((raw_text or "").split())
+
         if not text:
             return {
                 "medicine_name": "",
@@ -22,37 +23,89 @@ class OCRRecognizer:
                 "raw_text": "",
             }
 
-        dosage_match = re.search(r"\b(\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?))\b", text, re.I)
-        qty_match = re.search(r"\b(?:qty|quantity|count|tablets?|capsules?|pills?)\s*[:=-]?\s*(\d+)\b", text, re.I)
-        freq_match = re.search(
-            r"\b(once|twice|thrice|\d+\s*(?:times?|x)\s*(?:a|per)?\s*day|\d+\s*/\s*day|daily|weekly)\b",
+        dosage_match = re.search(
+            r"\b(\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu|units?))\b",
             text,
             re.I,
         )
-        medicine_match = re.search(
-            r"(?:rx\s*[:=-]?\s*|medicine\s*[:=-]?\s*|drug\s*[:=-]?\s*)([A-Za-z][A-Za-z0-9-]*)",
-            text,
-            re.I,
-        )
-        if not medicine_match:
-            medicine_match = re.search(r"\b([A-Za-z][A-Za-z0-9-]{2,})\s+\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu)\b", text, re.I)
 
-        quantity = int(qty_match.group(1)) if qty_match else 0
+        qty_match = re.search(
+            r"\b(?:qty|quantity|count|tablets?|capsules?|pills?)"
+            r"\s*[:=-]?\s*(\d+)\b"
+            r"|\b(\d+)\s*(?:tablets?|capsules?|pills?)\b",
+            text,
+            re.I,
+        )
+
+        freq_match = re.search(
+            r"\b(once|twice|thrice|"
+            r"\d+\s*(?:times?|x)\s*(?:a|per)?\s*day|"
+            r"\d+\s*/\s*day|daily|weekly)\b",
+            text,
+            re.I,
+        )
+
+        medicine_match = re.search(
+            r"(?:rx\s*[:=-]?\s*|medicine\s*[:=-]?\s*|drug\s*[:=-]?\s*)"
+            r"([A-Za-z][A-Za-z0-9-]*)",
+            text,
+            re.I,
+        )
+
+        if not medicine_match:
+            medicine_match = re.search(
+                r"\b([A-Za-z][A-Za-z0-9-]{2,})\s+"
+                r"\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu)\b",
+                text,
+                re.I,
+            )
+
+        quantity = (
+            int(qty_match.group(1) or qty_match.group(2))
+            if qty_match
+            else 0
+        )
+
         dosage = dosage_match.group(1) if dosage_match else ""
         frequency = freq_match.group(1) if freq_match else ""
         medicine_name = medicine_match.group(1) if medicine_match else ""
-        instruction_match = re.search(r"(?:take|instructions?)\s+(.+?)(?:\.|$)", text, re.I)
-        instructions = instruction_match.group(1).strip() if instruction_match else ""
 
-        fields = sum(bool(v) for v in [medicine_name, dosage, quantity, frequency])
-        confidence = round(fields / 4 * 0.9 + (0.1 if fields == 4 else 0), 2)
+        instruction_match = re.search(
+            r"(?:take|instructions?)\s+(.+?)(?:\.|$)",
+            text,
+            re.I,
+        )
+
+        instructions = (
+            instruction_match.group(1).strip()
+            if instruction_match
+            else ""
+        )
+
+        core_fields = sum(
+            bool(value)
+            for value in [medicine_name, dosage]
+        )
+
+        optional_fields = sum(
+            bool(value)
+            for value in [quantity, frequency]
+        )
+
+        if core_fields == 2:
+            confidence = 0.95 + (0.05 * optional_fields / 2)
+        elif core_fields == 1:
+            confidence = 0.65 + (0.1 * optional_fields / 2)
+        else:
+            confidence = 0.0
+
         return {
             "medicine_name": medicine_name,
             "dosage": dosage,
             "quantity": quantity,
             "frequency": frequency,
             "instructions": instructions,
-            "confidence": confidence,
+            "confidence": round(confidence, 2),
             "raw_text": text,
         }
 
@@ -62,9 +115,16 @@ class OCRRecognizer:
             import pytesseract
             from PIL import Image
         except ImportError as exc:
-            raise RuntimeError("OCR dependencies are not installed. Run pip install -r backend/requirements/base.txt") from exc
+            raise RuntimeError(
+                "OCR dependencies are not installed. "
+                "Run pip install -r backend/requirements/base.txt"
+            ) from exc
 
-        text = pytesseract.image_to_string(Image.open(Path(image_path)))
+        text = pytesseract.image_to_string(
+            Image.open(Path(image_path))
+        )
+
         result = OCRRecognizer.extract_prescription_text(text)
         result["raw_text"] = text.strip()
+
         return result
