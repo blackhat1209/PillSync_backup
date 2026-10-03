@@ -1,0 +1,32 @@
+# Runtime dependencies for the PillSync backend.
+# Pin a version when you add a package so every branch installs the same thing.
+
+# Web framework
+django==5.0.10
+djangorestframework==3.15.2
+django-cors-headers==4.6.0
+
+# Auth
+djangorestframework-simplejwt==5.3.1
+
+# Database
+psycopg[binary]==3.2.3
+
+# Background jobs / scheduling
+celery==5.4.0
+redis==5.2.1
+
+# OCR and NLP
+pytesseract==0.3.13
+Pillow==11.1.0
+opencv-python-headless==4.11.0.86
+# spacy==3.*
+# openai==1.*
+
+# Notifications
+# firebase-admin==6.*
+# twilio==9.*
+# sendgrid==6.*
+
+# Utilities
+python-dotenv==1.0.1

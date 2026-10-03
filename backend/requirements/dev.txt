@@ -1,0 +1,11 @@
+-r base.txt
+
+# Tooling that CI runs on every push — keep these installed locally too.
+ruff==0.8.6
+black==24.10.0
+isort==5.13.2
+pytest==8.3.4
+pytest-cov==6.0.0
+
+# Pytest Django
+pytest-django==4.9.0

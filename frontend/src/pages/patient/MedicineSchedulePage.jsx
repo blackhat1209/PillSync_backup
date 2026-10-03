@@ -1,0 +1,14 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, CheckCircle2, Calendar, Plus } from 'lucide-react';
+import { getSchedules } from '../../features/medications/medicationService';
+import { getActiveProfile } from '../../features/profile/familyProfileService';
+import { recordIntakeLog } from '../../features/adherence/historyService';
+
+export default function MedicineSchedulePage() {
+  const navigate=useNavigate(); const [schedule,setSchedule]=useState([]); const [profile,setProfile]=useState(null); const [error,setError]=useState('');
+  const load=async()=>{try{const p=await getActiveProfile();setProfile(p);setSchedule(p?await getSchedules(p.id):[]);}catch(e){setError(e.message);}};
+  useEffect(()=>{load();},[]);
+  const setStatus=async(item,status)=>{try{await recordIntakeLog({patient_profile:profile.id,medicine:item.medicine,schedule:item.id,medicine_name:item.medicine_name,dosage:item.dosage_amount,action_date:new Date().toISOString().slice(0,10),action_time:item.scheduled_time,status,notes:`Marked ${status} from schedule`});setSchedule(s=>s.map(x=>x.id===item.id?{...x,status}:x));}catch(e){setError(e.message);}};
+  return <div style={{display:'flex',flexDirection:'column',gap:20}}><div style={{display:'flex',justifyContent:'space-between'}}><h2>📅 Today's Medicine Schedule</h2><button onClick={()=>navigate('/patient/add-medicine')} className="btn-primary"><Plus size={16}/> Add Medicine</button></div>{error&&<div style={{color:'#dc2626'}}>{error}</div>}{!schedule.length?<div className="glass-card" style={{padding:40,textAlign:'center'}}><Calendar size={44} color="#DC143C"/><h3>No schedules found</h3><p>Add a medicine to create a schedule.</p><button onClick={()=>navigate('/patient/add-medicine')} className="btn-primary">Add Medicine Schedule</button></div>:<div style={{display:'flex',flexDirection:'column',gap:14}}>{schedule.map(item=><div key={item.id} className="glass-card" style={{padding:20,display:'flex',justifyContent:'space-between',alignItems:'center',gap:15}}><div><div style={{fontWeight:800,color:'#DC143C'}}><Clock size={16} style={{verticalAlign:'middle'}}/> {item.scheduled_time}</div><h3 style={{margin:'6px 0'}}>{item.medicine_name}</h3><span style={{color:'#64748b'}}>{item.dosage_amount} • {item.time_slot} • {item.frequency}</span></div><div>{item.status?<span className={item.status==='Taken'?'badge-taken':item.status==='Missed'?'badge-missed':'badge-snoozed'}>{item.status}</span>:<div style={{display:'flex',gap:8}}><button className="btn-primary" onClick={()=>setStatus(item,'Taken')}>Taken</button><button onClick={()=>setStatus(item,'Missed')} style={{padding:'7px 10px',color:'#dc2626',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:6}}>Missed</button></div>}</div></div>)}</div>}</div>;
+}
