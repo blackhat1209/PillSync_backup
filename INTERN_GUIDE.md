@@ -236,7 +236,7 @@ Instead:
 
 ```python
 # Wrong — this is now public.
-OPENAI_API_KEY = "sk-proj-abc123..."
+OPENAI_API_KEY = "your-openai-api-key"
 
 # Right.
 import os
