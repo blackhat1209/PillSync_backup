@@ -1,47 +1,61 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiFetch } from '../../api/client';
 import { Users, Server, ShieldCheck, Activity, Plus, Trash2, Edit2, ShieldAlert } from 'lucide-react';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
-  // Start with empty users directory - NO PRE-POPULATED HARDCODED DATA
   const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [usersError, setUsersError] = useState('');
 
-  // Manual Add User Form State
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState({
-    name: '', email: '', role: 'Patient', status: 'Active'
-  });
+  useEffect(() => {
+    let mounted = true;
 
-  const handleAddUserSubmit = (e) => {
-    e.preventDefault();
-    if (!newUser.name || !newUser.email) return;
-    const added = {
-      id: Date.now(),
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      status: newUser.status
+    const loadUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        setUsersError('');
+        const profiles = await apiFetch('/profiles/');
+
+        if (!mounted) return;
+
+        const patientUsers = Array.isArray(profiles)
+          ? profiles.map(profile => ({
+              id: profile.id,
+              name: profile.name || 'Unnamed Patient',
+              email: profile.email || 'No email',
+              role: 'Patient',
+              status: 'Active',
+              phone: profile.phone || ''
+            }))
+          : [];
+
+        setUsers(patientUsers);
+      } catch (error) {
+        if (mounted) {
+          setUsersError(error.message || 'Failed to load patients.');
+        }
+      } finally {
+        if (mounted) {
+          setLoadingUsers(false);
+        }
+      }
     };
-    setUsers([...users, added]);
-    setNewUser({ name: '', email: '', role: 'Patient', status: 'Active' });
-    setShowAddForm(false);
-  };
 
-  const toggleUserStatus = (id) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'Active' ? 'Blocked' : 'Active' } : u));
-  };
+    loadUsers();
 
-  const handleDeleteUser = (id) => {
-    setUsers(users.filter(u => u.id !== id));
-  };
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  // Dynamic calculations based ONLY on user-entered data
   const totalUsers = users.length;
-  const patientCount = users.filter(u => u.role === 'Patient').length;
-  const caregiverCount = users.filter(u => u.role === 'Caregiver').length;
-  const adminCount = users.filter(u => u.role === 'Admin' || u.role === 'Administrator').length;
+  const patientCount = users.length;
+  const caregiverCount = 0;
+  const adminCount = 0;
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1100px', margin: '0 auto', paddingBottom: '40px' }}>
@@ -61,80 +75,11 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          <button 
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="btn-primary" 
-            style={{ fontSize: '0.88rem', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: '6px', background: '#334155' }}
-          >
-            <Plus size={16} /> {showAddForm ? 'Cancel Form' : 'Add New System User'}
-          </button>
+          <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+            Live data from registered patient profiles
+          </div>
         </div>
       </div>
-
-      {/* Manual Add User Form */}
-      {showAddForm && (
-        <div className="glass-card" style={{ padding: '24px', maxWidth: '600px' }}>
-          <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 800, color: '#334155' }}>
-            ➕ Manually Register System User
-          </h3>
-          <form onSubmit={handleAddUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>Full Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Dr. Sarah Smith" 
-                  value={newUser.name} 
-                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} 
-                  style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }} 
-                  required 
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>Email Address</label>
-                <input 
-                  type="email" 
-                  placeholder="user@pillsync.org" 
-                  value={newUser.email} 
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} 
-                  style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }} 
-                  required 
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>User Role</label>
-                <select 
-                  value={newUser.role} 
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} 
-                  style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                >
-                  <option value="Patient">Patient</option>
-                  <option value="Caregiver">Caregiver</option>
-                  <option value="Admin">Administrator</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '0.8rem', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '4px' }}>Account Status</label>
-                <select 
-                  value={newUser.status} 
-                  onChange={(e) => setNewUser({ ...newUser, status: e.target.value })} 
-                  style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                >
-                  <option value="Active">Active</option>
-                  <option value="Blocked">Blocked</option>
-                </select>
-              </div>
-            </div>
-
-            <button type="submit" style={{ padding: '10px', background: '#334155', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, fontSize: '0.9rem', marginTop: '6px', cursor: 'pointer' }}>
-              [ Save & Register User ]
-            </button>
-          </form>
-        </div>
-      )}
 
       {/* Dynamic System Metrics (Based ONLY on User Data) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
@@ -151,15 +96,15 @@ export default function AdminDashboard() {
         </div>
 
         <div className="glass-card" style={{ padding: '20px' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Registered Caregivers</span>
-          <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#d97706', margin: '4px 0' }}>{caregiverCount}</div>
-          <span style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 600 }}>Caregiver accounts</span>
+          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Patient Profiles</span>
+          <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#d97706', margin: '4px 0' }}>{patientCount}</div>
+          <span style={{ fontSize: '0.8rem', color: '#d97706', fontWeight: 600 }}>Profiles in database</span>
         </div>
 
         <div className="glass-card" style={{ padding: '20px' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Administrators</span>
-          <div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#16a34a', margin: '4px 0' }}>{adminCount}</div>
-          <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 600 }}>Admin accounts</span>
+          <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Data Source</span>
+          <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#16a34a', margin: '10px 0' }}>LIVE</div>
+          <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 600 }}>Backend database</span>
         </div>
       </div>
 
@@ -169,7 +114,33 @@ export default function AdminDashboard() {
           👥 Registered User Directory ({users.length})
         </h3>
 
-        {users.length === 0 ? (
+        {loadingUsers ? (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            backgroundColor: '#f8fafc',
+            borderRadius: '16px'
+          }}>
+            <Users size={44} color="#334155" style={{ marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 6px', fontSize: '1.1rem', fontWeight: 800, color: '#2B181D' }}>
+              Loading Registered Patients...
+            </h4>
+          </div>
+        ) : usersError ? (
+          <div style={{
+            padding: '40px 20px',
+            textAlign: 'center',
+            backgroundColor: '#fff1f2',
+            borderRadius: '16px',
+            border: '2px dashed #fecdd3'
+          }}>
+            <ShieldAlert size={44} color="#dc2626" style={{ marginBottom: '12px' }} />
+            <h4 style={{ margin: '0 0 6px', fontSize: '1.1rem', fontWeight: 800, color: '#991b1b' }}>
+              Unable to Load Patient Data
+            </h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#7f1d1d' }}>{usersError}</p>
+          </div>
+        ) : users.length === 0 ? (
           <div style={{
             padding: '40px 20px',
             textAlign: 'center',
@@ -182,14 +153,11 @@ export default function AdminDashboard() {
               No Registered System Users
             </h4>
             <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#7E646A', maxWidth: '460px', marginLeft: 'auto', marginRight: 'auto' }}>
-              The admin directory is completely empty. Click <strong>"Add New System User"</strong> above to manually register a Patient, Caregiver, or Admin.
+              No patient profiles are currently registered in the backend database.
             </p>
-            <button 
-              onClick={() => setShowAddForm(true)} 
-              style={{ background: '#334155', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 18px', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-            >
-              <Plus size={16} /> Add User Manually
-            </button>
+            <div style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: 600 }}>
+              Patients will appear here automatically after registration.
+            </div>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -217,20 +185,9 @@ export default function AdminDashboard() {
                       <span className={u.status === 'Active' ? 'badge-taken' : 'badge-missed'}>{u.status}</span>
                     </td>
                     <td style={{ padding: '12px 10px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                        <button 
-                          onClick={() => toggleUserStatus(u.id)}
-                          style={{ border: '1px solid #cbd5e1', background: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', color: u.status === 'Active' ? '#dc2626' : '#16a34a' }}
-                        >
-                          {u.status === 'Active' ? 'Block' : 'Unblock'}
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteUser(u.id)}
-                          style={{ border: '1px solid #fecdd3', background: '#fef2f2', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', color: '#dc2626' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
+                        Registered
+                      </span>
                     </td>
                   </tr>
                 ))}
